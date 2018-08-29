@@ -38,7 +38,7 @@ public class MulticastPeer {
                 String userName = scanner.nextLine();
                 user.setPeerName(userName);
 
-                EventPackage newUserPackage = new EventPackage(EventType.USER_CONNECTED, user);
+                EventPackage newUserPackage = new EventPackage(EventType.USER_CONNECTED, user.getPeerName(), user.getPublicKey());
                 try {
                     sendUserEventPackage(socket, group, newUserPackage);
                 } catch (IOException e) {
@@ -78,7 +78,7 @@ public class MulticastPeer {
                             // Chama próximo da fila
                             ResourceEventPackage nextPeer = user.getResourcesQueues().get(currentResourceBeingUsed.getResourceKey()).remove();
                             ResourceEventPackage callNextPeer = new ResourceEventPackage(EventType.RESOURCE_RESPONSE, user, currentResourceBeingUsed);
-                            callNextPeer.setDestinationPublicKey(nextPeer.getUser().getPublicKey());
+                            callNextPeer.setDestinationPublicKey(nextPeer.getSenderPublicKey());
                             callNextPeer.setResponse(ResourceResponse.FREE);
                             try {
                                 sendUserEventPackage(socket, group, callNextPeer);
@@ -110,7 +110,7 @@ public class MulticastPeer {
                     isWaitingForAnswer = true;
                     switch (message) {
                         case 0:
-                            EventPackage disconnectPackage = new EventPackage(EventType.USER_DISCONNECTED, user);
+                            EventPackage disconnectPackage = new EventPackage(EventType.USER_DISCONNECTED, user.getPeerName(), user.getPublicKey());
                             try {
                                 sendUserEventPackage(socket, group, disconnectPackage);
                                 return;
@@ -119,7 +119,7 @@ public class MulticastPeer {
                             }
                             break;
                         case 1:
-                            EventPackage listConnectedUsersPackage = new EventPackage(EventType.REQUEST_CONNECTED_USERS, user);
+                            EventPackage listConnectedUsersPackage = new EventPackage(EventType.REQUEST_CONNECTED_USERS, user.getPeerName(), user.getPublicKey());
                             try {
                                 sendUserEventPackage(socket, group, listConnectedUsersPackage);
                             } catch (IOException e) {
@@ -175,6 +175,9 @@ public class MulticastPeer {
 
             }).start();
 
+            /////////////////////////////////
+            /////////////////////////////////
+            // Thread controladora de mensagens à serem recebidas
             while (true) {
 
                 // Timer para controle de timeout
@@ -187,7 +190,7 @@ public class MulticastPeer {
                     @Override
                     public void run() {
                         if (messageIn.getAddress() == null){
-                            EventPackage userResponsePackage = new EventPackage(EventType.USER_DROPED, user);
+                            EventPackage userResponsePackage = new EventPackage(EventType.USER_DROPED, user.getPeerName(), user.getPublicKey());
                             try {
                                 sendUserEventPackage(socket, group, userResponsePackage);
                                 return;
@@ -206,10 +209,10 @@ public class MulticastPeer {
                 // Todos os peers que receberam a mensagem do peer recentemente conectado, enviarão para o mesmo seus estados.
                 switch (eventReceived.getType()) {
                     case USER_CONNECTED_RESPONSE:
-                        String peerPublicKey = eventReceived.getUser().getPublicKey();
+                        String peerPublicKey = eventReceived.getSenderPublicKey();
                         if (!user.getKeys().containsKey(peerPublicKey)) {
                             user.getKeys().put(peerPublicKey, "");
-                            HashMap<Integer, Resource> receivedResources = eventReceived.getUser().getResources();
+                            HashMap<Integer, Resource> receivedResources = eventReceived.getResources();
                             for (Integer resourceKey : receivedResources.keySet()){
                                 user.getResources().put(resourceKey, receivedResources.get(resourceKey));
                             }
@@ -222,12 +225,13 @@ public class MulticastPeer {
 
                     // Mensagem recebida de um usuário que acabou de se conectar
                     case USER_CONNECTED:
-                        if (!user.getKeys().containsKey(eventReceived.getUser().getPublicKey())){
-                            user.getKeys().put(eventReceived.getUser().getPublicKey(), "");
+                        if (!user.getKeys().containsKey(eventReceived.getSenderPublicKey())){
+                            user.getKeys().put(eventReceived.getSenderPublicKey(), "");
                         }
-                        if (user.getKeys().get(eventReceived.getUser().getPublicKey()) == "") {
-                            EventPackage userResponsePackage = new EventPackage(EventType.USER_CONNECTED_RESPONSE, user);
-                            userResponsePackage.setDestinationPublicKey(eventReceived.getUser().getPublicKey());
+                        if (user.getKeys().get(eventReceived.getSenderPublicKey()) == "") {
+                            EventPackage userResponsePackage = new EventPackage(EventType.USER_CONNECTED_RESPONSE, user.getPeerName(), user.getPublicKey());
+                            userResponsePackage.setDestinationPublicKey(eventReceived.getSenderPublicKey());
+                            userResponsePackage.setResources(user.getResources());
                             sendUserEventPackage(socket, group, userResponsePackage);
                         }
                         System.out.println(eventReceived.getMessage());
@@ -236,8 +240,8 @@ public class MulticastPeer {
                     // Mensagem recebida de um usuário que foi desconectado
                     case USER_DISCONNECTED:
                         System.out.println(eventReceived.getMessage());
-                        user.getKeys().remove(eventReceived.getUser().getPublicKey());
-                        if (user.getKeys().get(eventReceived.getUser().getPublicKey()) != "") {
+                        user.getKeys().remove(eventReceived.getSenderPublicKey());
+                        if (user.getKeys().get(eventReceived.getSenderPublicKey()) != "") {
                             return;
                         }
                         break;
@@ -245,8 +249,8 @@ public class MulticastPeer {
                     // Mensagem recebida de um usuário que foi desconectado por inatividade ou conexão comprometida
                     case USER_DROPED:
                         System.out.println(eventReceived.getMessage());
-                        user.getKeys().remove(eventReceived.getUser().getPublicKey());
-                        if (user.getKeys().get(eventReceived.getUser().getPublicKey()) != "") {
+                        user.getKeys().remove(eventReceived.getSenderPublicKey());
+                        if (user.getKeys().get(eventReceived.getSenderPublicKey()) != "") {
                             return;
                         }
                         break;
@@ -254,15 +258,15 @@ public class MulticastPeer {
                     // Recebe pedido de identificação de um peer (O peer que receber esta mensagem enviará uma resposta para o peer que
                     // requisitou a lista de usuários conectados).
                     case REQUEST_CONNECTED_USERS:
-                        EventPackage userResponsePackage = new EventPackage(EventType.CONNECTED_USERS_RESPONSE, user);
-                        userResponsePackage.setDestinationPublicKey(eventReceived.getUser().getPublicKey());
+                        EventPackage userResponsePackage = new EventPackage(EventType.CONNECTED_USERS_RESPONSE, user.getPeerName(), user.getPublicKey());
+                        userResponsePackage.setDestinationPublicKey(eventReceived.getSenderPublicKey());
                         sendUserEventPackage(socket, group, userResponsePackage);
                         break;
 
                     // Recebe respostas de peers conectados
                     case CONNECTED_USERS_RESPONSE:
                         if (user.getKeys().get(eventReceived.getDestinationPublicKey()) != "") {
-                            System.out.println(eventReceived.getUser().getPeerName());
+                            System.out.println(eventReceived.getSenderUsername());
                         }
                         break;
 
@@ -283,12 +287,12 @@ public class MulticastPeer {
 
                             user.getResourcesQueues().get(resource.getResourceKey()).add(resourceEvent);
                             ResourceEventPackage resourceResponse = new ResourceEventPackage(EventType.RESOURCE_RESPONSE, user, resource);
-                            resourceResponse.setDestinationPublicKey(resourceEvent.getUser().getPublicKey());
+                            resourceResponse.setDestinationPublicKey(resourceEvent.getSenderPublicKey());
                             resourceResponse.setResponse(ResourceResponse.OCCUPIED);
                             sendUserEventPackage(socket, group, resourceResponse);
                         }else{
                             ResourceEventPackage resourceResponse = new ResourceEventPackage(EventType.RESOURCE_RESPONSE, user, resource);
-                            resourceResponse.setDestinationPublicKey(resourceEvent.getUser().getPublicKey());
+                            resourceResponse.setDestinationPublicKey(resourceEvent.getSenderPublicKey());
                             resourceResponse.setResponse(ResourceResponse.FREE);
                             sendUserEventPackage(socket, group, resourceResponse);
                         }
@@ -318,7 +322,7 @@ public class MulticastPeer {
                     case UPDATE_RESOURCE_QUEUE:
                         resourceEvent = (ResourceEventPackage) eventReceived;
                         // Atualiza fila de peers esperando o recurso
-                        user.setResourcesQueues(resourceEvent.getUser().getResourcesQueues());
+                        user.setResourcesQueues(resourceEvent.getResourcesQueues());
                         break;
 
                 }

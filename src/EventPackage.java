@@ -1,4 +1,5 @@
 import java.io.Serializable;
+import java.util.HashMap;
 
 // Representa o tipo de evento que ocorreu
 enum EventType {
@@ -12,31 +13,71 @@ enum EventType {
     }
 }
 
+// Pacote enviado para todos os peers conectados ao enviar mensagem
 public class EventPackage implements Serializable {
 
+    //Tipo do evento
     private EventType type;
-    private User user;
+
+    //Representa o username do peer que enviou o pacote
+    private String senderUsername;
+
+    //Representa a chave pública do peer que enviou o pacote
+    private String senderPublicKey;
+
+    //Representa a chave pública do peer receptor, em caso de mensagem específica
     private String destinationPublicKey;
+
+    //Mensagem a ser impressa na tela ao receber o pacote
     private String message;
 
-    public EventPackage(EventType type, User user) {
+    //Lista de recursos que podem ser enviados junto com o pacote, não necessariamente obrigatório
+    HashMap<Integer,Resource> resources = new HashMap<Integer, Resource>();
+
+
+    public EventPackage(EventType type, String username, String senderPublicKey) {
         this.type = type;
-        this.user = user;
+        this.senderUsername = username;
+        this.senderPublicKey = senderPublicKey;
         switch (type){
             case USER_CONNECTED:
-                this.message = "Usuário: " + user.getPeerName() + " conectado.";
+                this.message = "Usuário: " + senderUsername + " conectado.";
                 break;
             case USER_DISCONNECTED:
-                this.message = "Usuário: " + user.getPeerName() + " se desconectou.";
+                this.message = "Usuário: " + senderUsername + " se desconectou.";
                 break;
             case USER_DROPED:
-                this.message = "Usuário: " + user.getPeerName() + " caiu.";
+                this.message = "Usuário: " + senderUsername + " caiu.";
                 break;
             default:
                 this.message = "";
                 break;
         }
 
+    }
+
+    public HashMap<Integer, Resource> getResources() {
+        return resources;
+    }
+
+    public void setResources(HashMap<Integer, Resource> resources) {
+        this.resources = resources;
+    }
+
+    public String getSenderUsername() {
+        return senderUsername;
+    }
+
+    public void setSenderUsername(String senderUsername) {
+        this.senderUsername = senderUsername;
+    }
+
+    public String getSenderPublicKey() {
+        return senderPublicKey;
+    }
+
+    public void setSenderPublicKey(String senderPublicKey) {
+        this.senderPublicKey = senderPublicKey;
     }
 
     public String getDestinationPublicKey() {
@@ -53,14 +94,6 @@ public class EventPackage implements Serializable {
 
     public void setType(EventType type) {
         this.type = type;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public void setUser(User user) {
-        this.user = user;
     }
 
     public String getMessage() {
