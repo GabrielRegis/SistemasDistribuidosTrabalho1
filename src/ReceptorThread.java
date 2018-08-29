@@ -4,27 +4,28 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
-import java.net.SocketException;
 import java.util.HashMap;
 import java.util.PriorityQueue;
 import java.util.Timer;
 import java.util.TimerTask;
 
+// Thread receptora
 public class ReceptorThread extends MulticastThread {
 
-    public ReceptorThread(MulticastSocket socketObj, InetAddress groupObj, User userObj) {
-        super(socketObj, groupObj, userObj);
+    public ReceptorThread(MulticastSocket socketObj, InetAddress groupObj) {
+        super(socketObj, groupObj);
     }
 
     @Override
-    public void run() {
-        super.run();
+    public synchronized void start() {
+        super.start();
         while (true) {
 
             // Timer para controle de timeout
             Timer timer = new Timer();
             byte[] buffer = new byte[10000];
             DatagramPacket messageIn = new DatagramPacket(buffer, buffer.length);
+            User user = MulticastPeer.user;
 
             // A cada 4 segundos, caso o peer não receber as mensagens, o peer será desconectado
             timer.schedule(new TimerTask() {
@@ -48,8 +49,9 @@ public class ReceptorThread extends MulticastThread {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+
             EventPackage eventReceived = SerializationUtils.deserialize(messageIn.getData());
-            latch.countDown();
+            MulticastPeer.latch.countDown();
 
             // Todos os peers que receberam a mensagem do peer recentemente conectado, enviarão para o mesmo seus estados.
             switch (eventReceived.getType()) {
@@ -136,7 +138,7 @@ public class ReceptorThread extends MulticastThread {
 
                     if (resource.getResourceState() == ResourceState.HELD ||
                             (resource.getResourceState() == ResourceState.WANTED &&
-                                    resourceRequestTimeStamp.isBefore(resourceEvent.getTimeStamp()))) {
+                                    MulticastPeer.resourceRequestTimeStamp.isBefore(resourceEvent.getTimeStamp()))) {
 
                         user.getResourcesQueues().get(resource.getResourceKey()).add(resourceEvent);
                         ResourceEventPackage resourceResponse = new ResourceEventPackage(EventType.RESOURCE_RESPONSE, user, resource);
@@ -165,11 +167,11 @@ public class ReceptorThread extends MulticastThread {
                     if (deserialize(resourceEvent.getDestinationPublicKey())) {
                         switch (resourceEvent.getResponse()) {
                             case FREE:
-                                responseLatch.countDown();
-                                if (responseLatch.getCount() == 0) {
+                                MulticastPeer.responseLatch.countDown();
+                                if (MulticastPeer.responseLatch.getCount() == 0) {
                                     user.getResources().get(resourceEvent.getResource().getResourceKey()).setResourceState(ResourceState.HELD);
-                                    isUsingSharedResource = true;
-                                    currentResourceBeingUsed = resourceEvent.getResource();
+                                    MulticastPeer.isUsingSharedResource = true;
+                                    MulticastPeer.currentResourceBeingUsed = resourceEvent.getResource();
                                 }
                                 break;
                             case OCCUPIED:
@@ -189,4 +191,11 @@ public class ReceptorThread extends MulticastThread {
             }
         }
     }
+
+    // Método utilizado para verificar se o pacote recebido tem como peer destino o peer que disparar esta função.
+    // Recebe uma public que, e se, a public key estiver vinculada à uma private key no hash de keys, então deserializa o pacote.
+    public static boolean deserialize(String publicKey){
+        return MulticastPeer.user.getKeys().get(publicKey) != "";
+    }
+
 }

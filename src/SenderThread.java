@@ -6,18 +6,21 @@ import java.util.Scanner;
 import java.util.concurrent.CountDownLatch;
 
 public class SenderThread extends MulticastThread{
-    public SenderThread(MulticastSocket socketObj, InetAddress groupObj, User userObj) {
-        super(socketObj, groupObj, userObj);
+
+    public SenderThread(MulticastSocket socketObj, InetAddress groupObj) {
+        super(socketObj, groupObj);
     }
 
     @Override
-    public void run() {
+    public synchronized void start() {
+        super.start();
         super.run();
         System.out.println("Digite um nome de usuário: ");
         Scanner scanner = new Scanner(System.in);
         String userName = scanner.nextLine();
-        user.setPeerName(userName);
+        MulticastPeer.user.setPeerName(userName);
 
+        User user = MulticastPeer.user;
         EventPackage newUserPackage = new EventPackage(EventType.USER_CONNECTED, user.getPeerName(), user.getPublicKey());
         try {
             sendUserEventPackage(socket, group, newUserPackage);
@@ -28,9 +31,9 @@ public class SenderThread extends MulticastThread{
 
             // Espera o limite máximo de todos os peers responderem
             try {
-                latch.await();
-                if(responseLatch != null){
-                    responseLatch.await();
+                MulticastPeer.latch.await();
+                if(MulticastPeer.responseLatch != null){
+                    MulticastPeer.responseLatch.await();
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -44,20 +47,20 @@ public class SenderThread extends MulticastThread{
             }
 
             // Verifica se está utilizando algum recurso (Bloqueia menu)
-            if(isUsingSharedResource){
+            if(MulticastPeer.isUsingSharedResource){
                 System.out.println("Utilizando recurso, digite 0 para liberar recurso.");
                 String nextMessage = scanner.next();
-                isUsingSharedResource = false;
+                MulticastPeer.isUsingSharedResource = false;
 
                 // Libera recurso
-                user.getResources().get(currentResourceBeingUsed.getResourceKey()).setResourceState(ResourceState.RELEASED);
+                user.getResources().get(MulticastPeer.currentResourceBeingUsed.getResourceKey()).setResourceState(ResourceState.RELEASED);
 
                 // Verifica se existem elementos na fila de recursos
-                if (user.getResourcesQueues().get(currentResourceBeingUsed.getResourceKey()).size() > 0){
+                if (user.getResourcesQueues().get(MulticastPeer.currentResourceBeingUsed.getResourceKey()).size() > 0){
 
                     // Chama próximo da fila
-                    ResourceEventPackage nextPeer = user.getResourcesQueues().get(currentResourceBeingUsed.getResourceKey()).remove();
-                    ResourceEventPackage callNextPeer = new ResourceEventPackage(EventType.RESOURCE_RESPONSE, user, currentResourceBeingUsed);
+                    ResourceEventPackage nextPeer = user.getResourcesQueues().get(MulticastPeer.currentResourceBeingUsed.getResourceKey()).remove();
+                    ResourceEventPackage callNextPeer = new ResourceEventPackage(EventType.RESOURCE_RESPONSE, user, MulticastPeer.currentResourceBeingUsed);
                     callNextPeer.setDestinationPublicKey(nextPeer.getSenderPublicKey());
                     callNextPeer.setResponse(ResourceResponse.FREE);
                     try {
@@ -68,14 +71,14 @@ public class SenderThread extends MulticastThread{
                 }
 
                 // Envia pacote para todos atualizarem a fila de peers para o recurso liberado
-                ResourceEventPackage updateQueuePackage = new ResourceEventPackage(EventType.UPDATE_RESOURCE_QUEUE, user, currentResourceBeingUsed);
+                ResourceEventPackage updateQueuePackage = new ResourceEventPackage(EventType.UPDATE_RESOURCE_QUEUE, user, MulticastPeer.currentResourceBeingUsed);
                 try {
                     sendUserEventPackage(socket, group, updateQueuePackage);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
 
-                currentResourceBeingUsed = null;
+                MulticastPeer.currentResourceBeingUsed = null;
             }
 
             // Mostra menu
@@ -87,7 +90,7 @@ public class SenderThread extends MulticastThread{
 
             int message = scanner.nextInt();
 
-            isWaitingForAnswer = true;
+            MulticastPeer.isWaitingForAnswer = true;
             switch (message) {
                 case 0:
                     EventPackage disconnectPackage = new EventPackage(EventType.USER_DISCONNECTED, user.getPeerName(), user.getPublicKey());
@@ -111,7 +114,7 @@ public class SenderThread extends MulticastThread{
                     scanner.nextLine();
                     String resourceName = scanner.nextLine();
 
-                    latch = new CountDownLatch(1);
+                    MulticastPeer.latch = new CountDownLatch(1);
                     Resource resource = new Resource(resourceName);
                     Integer resourceIndex = user.getResources().size();
                     resource.setResourceKey(resourceIndex);
@@ -135,11 +138,11 @@ public class SenderThread extends MulticastThread{
                     }
                     int nextIndex = scanner.nextInt();
 
-                    latch = new CountDownLatch(user.getKeys().size() + 1);
-                    responseLatch = new CountDownLatch(user.getKeys().size());
+                    MulticastPeer.latch = new CountDownLatch(user.getKeys().size() + 1);
+                    MulticastPeer.responseLatch = new CountDownLatch(user.getKeys().size());
                     user.getResources().get(nextIndex).setResourceState(ResourceState.WANTED);
                     LocalTime timeStamp = LocalTime.now();
-                    resourceRequestTimeStamp = timeStamp;
+                    MulticastPeer.resourceRequestTimeStamp = timeStamp;
                     ResourceEventPackage requestResource = new ResourceEventPackage(EventType.RESOURCE_REQUEST, user, user.getResources().get(nextIndex));
                     requestResource.setTimeStamp(timeStamp);
 
