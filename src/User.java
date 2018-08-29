@@ -1,39 +1,53 @@
 import java.io.Serializable;
-import java.util.HashMap;
-import java.util.UUID;
+import java.lang.reflect.Array;
+import java.util.*;
 
 public class User implements Serializable {
 
-    public String peerName;
-    public String publicKey;
-    HashMap<String,String> keys = new HashMap<String,String>();
-    HashMap<String,String> usernames = new HashMap<String,String>();
+    private String peerName;
+    private String publicKey;
+    private int port;
 
-    public User() {
-        peerName = "";
-        usernames.put("Banana", "");
-        usernames.put("Maçã", "");
-        usernames.put("Pera", "");
-        usernames.put("Uva", "");
-        usernames.put("Laranja", "");
-        usernames.put("Morango", "");
+    HashMap<String,String> keys = new HashMap<String,String>();
+    HashMap<Integer,Resource> resources = new HashMap<Integer, Resource>();
+    HashMap<Integer,PriorityQueue<ResourceEventPackage>> resourcesQueues = new HashMap<Integer, PriorityQueue<ResourceEventPackage>>();
+
+    public User(int port) {
+
+        this.peerName = "";
+        this.port = port;
 
         String publicKey = UUID.randomUUID().toString();
         String privateKey = UUID.randomUUID().toString();
 
         keys.put(publicKey, privateKey);
+
+        this.resourcesQueues = new HashMap<Integer, PriorityQueue<ResourceEventPackage>>();
         this.publicKey = publicKey;
     }
 
-    public void setUsername(){
-        for(HashMap.Entry<String, String> username : usernames.entrySet()){
-            if (username.getValue() == ""){
+    public HashMap<Integer, PriorityQueue<ResourceEventPackage>> getResourcesQueues() {
+        return resourcesQueues;
+    }
 
-                this.peerName = username.getKey();
+    public void setResourcesQueues(HashMap<Integer, PriorityQueue<ResourceEventPackage>> resourcesQueues) {
+        this.resourcesQueues = resourcesQueues;
+    }
 
-                break;
-            }
-        }
+    public int getPort() {
+        return port;
+    }
+
+    public void setPort(int port) {
+        this.port = port;
+    }
+
+    public HashMap<Integer, Resource> getResources() {
+        return resources;
+    }
+
+    public void setResources(HashMap<Integer, Resource> resourcesState) {
+        this.resources = resourcesState;
     }
 
     public String getPeerName() {
@@ -60,11 +74,4 @@ public class User implements Serializable {
         this.keys = keys;
     }
 
-    public HashMap<String, String> getUsernames() {
-        return usernames;
-    }
-
-    public void setUsernames(HashMap<String, String> usernames) {
-        this.usernames = usernames;
-    }
 }

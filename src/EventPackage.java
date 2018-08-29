@@ -1,22 +1,25 @@
 import java.io.Serializable;
 
-// Representa o tipo de evento de usuário que ocorreu
-enum UserEventType {
-    USER_CONNECTED(0), USER_DISCONNECTED(1), USER_DROPED(2), NEW_USER_REQUEST(3), NEW_USER_RESPONSE(4);
+// Representa o tipo de evento que ocorreu
+enum EventType {
+    USER_CONNECTED(0), USER_DISCONNECTED(1), USER_DROPED(2), USER_CONNECTED_RESPONSE(3),
+    REQUEST_CONNECTED_USERS(4), CONNECTED_USERS_RESPONSE(5), RESOURCE_REQUEST(6), RESOURCE_RESPONSE(7),
+    RELEASE_RESOURCE(8), CREATE_RESOURCE(9), UPDATE_RESOURCE_QUEUE(10);
 
     public int userEventIndex;
-    UserEventType(int index) {
+    EventType(int index) {
         userEventIndex = index;
     }
 }
 
-public class UserEventPackage implements Serializable {
+public class EventPackage implements Serializable {
 
-    private UserEventType type;
+    private EventType type;
     private User user;
+    private String destinationPublicKey;
     private String message;
 
-    public UserEventPackage(UserEventType type, User user) {
+    public EventPackage(EventType type, User user) {
         this.type = type;
         this.user = user;
         switch (type){
@@ -36,11 +39,19 @@ public class UserEventPackage implements Serializable {
 
     }
 
-    public UserEventType getType() {
+    public String getDestinationPublicKey() {
+        return destinationPublicKey;
+    }
+
+    public void setDestinationPublicKey(String destinationPublicKey) {
+        this.destinationPublicKey = destinationPublicKey;
+    }
+
+    public EventType getType() {
         return type;
     }
 
-    public void setType(UserEventType type) {
+    public void setType(EventType type) {
         this.type = type;
     }
 
