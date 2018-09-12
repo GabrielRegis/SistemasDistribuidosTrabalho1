@@ -26,7 +26,7 @@ public class SenderThread extends MulticastThread{
         MulticastPeer.user.setPeerName(userName);
 
         User user = MulticastPeer.user;
-        EventPackage newUserPackage = new EventPackage(EventType.USER_CONNECTED, user.getPeerName(), user.getPublicKey());
+        EventPackage newUserPackage = new EventPackage(EventType.USER_CONNECTED, user.getPeerName(), user.getPublicKey(), user.getPrivateKey());
         try {
             sendUserEventPackage(socket, group, newUserPackage);
         } catch (IOException e) {
@@ -105,7 +105,7 @@ public class SenderThread extends MulticastThread{
             MulticastPeer.isWaitingForAnswer = true;
             switch (message) {
                 case 0:
-                    EventPackage disconnectPackage = new EventPackage(EventType.USER_DISCONNECTED, user.getPeerName(), user.getPublicKey());
+                    EventPackage disconnectPackage = new EventPackage(EventType.USER_DISCONNECTED, user.getPeerName(), user.getPublicKey(), user.getPrivateKey());
                     try {
                         sendUserEventPackage(socket, group, disconnectPackage);
                         //socket.leaveGroup(group);
@@ -116,7 +116,7 @@ public class SenderThread extends MulticastThread{
                     }
                     break;
                 case 1:
-                    EventPackage listConnectedUsersPackage = new EventPackage(EventType.REQUEST_CONNECTED_USERS, user.getPeerName(), user.getPublicKey());
+                    EventPackage listConnectedUsersPackage = new EventPackage(EventType.REQUEST_CONNECTED_USERS, user.getPeerName(), user.getPublicKey(), user.getPrivateKey());
                     try {
                         sendUserEventPackage(socket, group, listConnectedUsersPackage);
                     } catch (IOException e) {

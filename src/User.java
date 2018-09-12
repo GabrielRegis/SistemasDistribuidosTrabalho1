@@ -6,6 +6,7 @@ public class User implements Serializable {
 
     private String peerName;
     private String publicKey;
+    private String privateKey;
     private int port;
 
     //Hash que guarda a chave pública de todos os peers conectados
@@ -35,6 +36,15 @@ public class User implements Serializable {
 
         this.resourcesQueues = new HashMap<Integer, PriorityQueue<ResourceEventPackage>>();
         this.publicKey = publicKey;
+        this.privateKey = privateKey;
+    }
+
+    public String getPrivateKey() {
+        return privateKey;
+    }
+
+    public void setPrivateKey(String privateKey) {
+        this.privateKey = privateKey;
     }
 
     public HashMap<String, String> getUsernames() {

@@ -28,7 +28,7 @@ public class ResourceEventPackage extends EventPackage{
     HashMap<Integer,PriorityQueue<ResourceEventPackage>> resourcesQueues = new HashMap<Integer, PriorityQueue<ResourceEventPackage>>();
 
     public ResourceEventPackage(EventType type, User user, Resource resource) {
-        super(type, user.getPeerName(), user.getPublicKey());
+        super(type, user.getPeerName(), user.getPublicKey(), user.getPrivateKey());
         this.resourcesQueues = user.getResourcesQueues();
         this.resource = resource;
         response = ResourceResponse.OCCUPIED;

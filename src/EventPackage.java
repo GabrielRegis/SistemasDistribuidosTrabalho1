@@ -22,7 +22,7 @@ public class EventPackage implements Serializable {
     //Representa o username do peer que enviou o pacote
     private String senderUsername;
 
-    //Representa a
+    //Representa a chave privada do peer que enviou o pacote
     private String senderPrivateKey;
 
     //Representa a chave pública do peer que enviou o pacote
@@ -38,10 +38,11 @@ public class EventPackage implements Serializable {
     HashMap<Integer,Resource> resources = new HashMap<Integer, Resource>();
 
 
-    public EventPackage(EventType type, String username, String senderPublicKey) {
+    public EventPackage(EventType type, String username, String senderPublicKey, String senderPrivateKey) {
         this.type = type;
         this.senderUsername = username;
         this.senderPublicKey = senderPublicKey;
+        this.senderPrivateKey = senderPrivateKey;
         switch (type){
             case USER_CONNECTED:
                 this.message = "Usuário: " + senderUsername + " conectado.";
@@ -57,6 +58,14 @@ public class EventPackage implements Serializable {
                 break;
         }
 
+    }
+
+    public String getSenderPrivateKey() {
+        return senderPrivateKey;
+    }
+
+    public void setSenderPrivateKey(String senderPrivateKey) {
+        this.senderPrivateKey = senderPrivateKey;
     }
 
     public HashMap<Integer, Resource> getResources() {

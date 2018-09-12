@@ -39,7 +39,7 @@ public class TimeoutThread extends MulticastThread{
             }, 4000);
 
             // Envia requisição de ack para todos
-            EventPackage sendAck = new EventPackage(EventType.REQUEST_ACK, MulticastPeer.user.getPeerName(), MulticastPeer.user.getPublicKey());
+            EventPackage sendAck = new EventPackage(EventType.REQUEST_ACK, MulticastPeer.user.getPeerName(), MulticastPeer.user.getPublicKey(), MulticastPeer.user.getPrivateKey());
             try {
                 sendUserEventPackage(socket, group, sendAck);
             } catch (IOException e) {

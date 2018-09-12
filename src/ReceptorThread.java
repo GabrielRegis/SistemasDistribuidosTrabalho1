@@ -58,7 +58,7 @@ public class ReceptorThread extends MulticastThread {
                         user.getUsernames().put(eventReceived.getSenderPublicKey(), eventReceived.getSenderUsername());
                     }
                     if (user.getKeys().get(eventReceived.getSenderPublicKey()) == "") {
-                        EventPackage userResponsePackage = new EventPackage(EventType.USER_CONNECTED_RESPONSE, user.getPeerName(), user.getPublicKey());
+                        EventPackage userResponsePackage = new EventPackage(EventType.USER_CONNECTED_RESPONSE, user.getPeerName(), user.getPublicKey(), user.getPrivateKey());
                         userResponsePackage.setDestinationPublicKey(eventReceived.getSenderPublicKey());
                         userResponsePackage.setResources(MulticastPeer.user.getResources());
 
@@ -94,7 +94,7 @@ public class ReceptorThread extends MulticastThread {
                 // Recebe pedido de identificação de um peer (O peer que receber esta mensagem enviará uma resposta para o peer que
                 // requisitou a lista de usuários conectados).
                 case REQUEST_CONNECTED_USERS:
-                    EventPackage userResponsePackage = new EventPackage(EventType.CONNECTED_USERS_RESPONSE, user.getPeerName(), user.getPublicKey());
+                    EventPackage userResponsePackage = new EventPackage(EventType.CONNECTED_USERS_RESPONSE, user.getPeerName(), user.getPublicKey(), user.getPrivateKey());
                     userResponsePackage.setDestinationPublicKey(eventReceived.getSenderPublicKey());
                     try {
                         sendUserEventPackage(socket, group, userResponsePackage);
@@ -120,6 +120,9 @@ public class ReceptorThread extends MulticastThread {
                     break;
 
                 // Mensagem recebida de um peer que gostaria de acessar um recurso específico
+                // Obs: Não é verificado se recursos na fila entraram antes (Segunda verificação do Algoritmo) pois
+                // a estrutura utilizada é uma lista de prioridades, e faz automáticamente. Verificar comparador na classe
+                // ResourceComparator
                 case RESOURCE_REQUEST:
                     resourceEvent = (ResourceEventPackage) eventReceived;
                     Resource resource = MulticastPeer.user.getResources().get(resourceEvent.getResource().getResourceKey());
@@ -148,10 +151,12 @@ public class ReceptorThread extends MulticastThread {
 
                     break;
 
+                // Resposta recebida de um peer enviando seu atual estado para o recurso solicitado por este peer (Atual).
                 case RESOURCE_RESPONSE:
                     resourceEvent = (ResourceEventPackage) eventReceived;
                     if (deserialize(resourceEvent.getDestinationPublicKey())) {
                         switch (resourceEvent.getResponse()) {
+                            // Caso o recurso esteja livre, envia seu estado como FREE para o recurso solicitado pelo peer remetente
                             case FREE:
                                 MulticastPeer.responseLatch.countDown();
                                 if (MulticastPeer.responseLatch.getCount() == 0) {
@@ -160,8 +165,8 @@ public class ReceptorThread extends MulticastThread {
                                     MulticastPeer.currentResourceBeingUsed = resourceEvent.getResource();
                                 }
                                 break;
+                            // Caso o recurso esteja ocupado, envia seu estado como OCCUPIED para o recurso solicitado pelo peer remetente
                             case OCCUPIED:
-
                                 System.out.println("Recurso sendo utilizado, por favor aguarde.");
                                 break;
                         }
@@ -174,8 +179,9 @@ public class ReceptorThread extends MulticastThread {
                     MulticastPeer.user.setResourcesQueues(resourceEvent.getResourcesQueues());
                     break;
 
+                // Peer remetente solicita ack para o peer atual (Controle de peers desconectados acidentalmente).
                 case REQUEST_ACK:
-                    EventPackage ackResponse = new EventPackage(EventType.ACK_RESPONSE, user.getPeerName(), user.getPublicKey());
+                    EventPackage ackResponse = new EventPackage(EventType.ACK_RESPONSE, user.getPeerName(), user.getPublicKey(), user.getPrivateKey());
                     ackResponse.setDestinationPublicKey(eventReceived.getDestinationPublicKey());
                     try {
                         sendUserEventPackage(socket, group, ackResponse);
@@ -184,6 +190,7 @@ public class ReceptorThread extends MulticastThread {
                     }
                     break;
 
+                // Peer recebe resposta de ack solicitado anteriormente.
                 case ACK_RESPONSE:
                     MulticastPeer.user.getAckPeers().put(eventReceived.getSenderPublicKey(), "Ack");
                     break;
