@@ -4,10 +4,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
-import java.util.HashMap;
-import java.util.PriorityQueue;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 
 // Thread receptora
 public class ReceptorThread extends MulticastThread {
@@ -21,28 +18,10 @@ public class ReceptorThread extends MulticastThread {
         super.start();
         while (true) {
 
-            // Timer para controle de timeout
-            Timer timer = new Timer();
+
             byte[] buffer = new byte[10000];
             DatagramPacket messageIn = new DatagramPacket(buffer, buffer.length);
             User user = MulticastPeer.user;
-
-            // A cada 4 segundos, caso o peer não receber as mensagens, o peer será desconectado
-            timer.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                    if (messageIn.getAddress() == null) {
-                        EventPackage userResponsePackage = new EventPackage(EventType.USER_DROPED, user.getPeerName(), user.getPublicKey());
-                        try {
-                            sendUserEventPackage(socket, group, userResponsePackage);
-                            return;
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-
-                }
-            }, 4000);
 
             try {
                 socket.receive(messageIn);
@@ -59,13 +38,15 @@ public class ReceptorThread extends MulticastThread {
                     String peerPublicKey = eventReceived.getSenderPublicKey();
                     if (!user.getKeys().containsKey(peerPublicKey)) {
                         user.getKeys().put(peerPublicKey, "");
+                        user.getUsernames().put(peerPublicKey, eventReceived.getSenderUsername());
+
                         HashMap<Integer, Resource> receivedResources = eventReceived.getResources();
                         for (Integer resourceKey : receivedResources.keySet()) {
                             user.getResources().put(resourceKey, receivedResources.get(resourceKey));
                         }
 
                         for (Resource resource : user.getResources().values()) {
-                            user.getResourcesQueues().put(resource.getResourceKey(), new PriorityQueue<ResourceEventPackage>());
+                            MulticastPeer.user.getResourcesQueues().put(resource.getResourceKey(), new PriorityQueue<ResourceEventPackage>());
                         }
                     }
                     break;
@@ -74,11 +55,13 @@ public class ReceptorThread extends MulticastThread {
                 case USER_CONNECTED:
                     if (!user.getKeys().containsKey(eventReceived.getSenderPublicKey())) {
                         user.getKeys().put(eventReceived.getSenderPublicKey(), "");
+                        user.getUsernames().put(eventReceived.getSenderPublicKey(), eventReceived.getSenderUsername());
                     }
                     if (user.getKeys().get(eventReceived.getSenderPublicKey()) == "") {
                         EventPackage userResponsePackage = new EventPackage(EventType.USER_CONNECTED_RESPONSE, user.getPeerName(), user.getPublicKey());
                         userResponsePackage.setDestinationPublicKey(eventReceived.getSenderPublicKey());
-                        userResponsePackage.setResources(user.getResources());
+                        userResponsePackage.setResources(MulticastPeer.user.getResources());
+
                         try {
                             sendUserEventPackage(socket, group, userResponsePackage);
                         } catch (IOException e) {
@@ -91,7 +74,8 @@ public class ReceptorThread extends MulticastThread {
                 // Mensagem recebida de um usuário que foi desconectado
                 case USER_DISCONNECTED:
                     System.out.println(eventReceived.getMessage());
-                    user.getKeys().remove(eventReceived.getSenderPublicKey());
+                    MulticastPeer.user.getKeys().remove(eventReceived.getSenderPublicKey());
+                    MulticastPeer.user.getUsernames().remove(eventReceived.getSenderPublicKey());
                     if (user.getKeys().get(eventReceived.getSenderPublicKey()) != "") {
                         return;
                     }
@@ -100,7 +84,8 @@ public class ReceptorThread extends MulticastThread {
                 // Mensagem recebida de um usuário que foi desconectado por inatividade ou conexão comprometida
                 case USER_DROPED:
                     System.out.println(eventReceived.getMessage());
-                    user.getKeys().remove(eventReceived.getSenderPublicKey());
+                    MulticastPeer.user.getKeys().remove(eventReceived.getSenderPublicKey());
+                    MulticastPeer.user.getUsernames().remove(eventReceived.getSenderPublicKey());
                     if (user.getKeys().get(eventReceived.getSenderPublicKey()) != "") {
                         return;
                     }
@@ -128,19 +113,20 @@ public class ReceptorThread extends MulticastThread {
                 // Recebe pacote de criação de recurso, atualiza sua lista de recursos
                 case CREATE_RESOURCE:
                     ResourceEventPackage resourceEvent = (ResourceEventPackage) eventReceived;
-                    user.getResources().put(resourceEvent.getResource().getResourceKey(), resourceEvent.getResource());
-                    user.getResourcesQueues().put(resourceEvent.getResource().getResourceKey(), new PriorityQueue<ResourceEventPackage>());
+                    MulticastPeer.user.getResources().put(resourceEvent.getResource().getResourceKey(), resourceEvent.getResource());
+                    ResourceComparator comparator = new ResourceComparator();
+                    PriorityQueue<ResourceEventPackage> queue = new PriorityQueue<ResourceEventPackage>(comparator);
+                    MulticastPeer.user.getResourcesQueues().put(resourceEvent.getResource().getResourceKey(), queue);
                     break;
 
+                // Mensagem recebida de um peer que gostaria de acessar um recurso específico
                 case RESOURCE_REQUEST:
                     resourceEvent = (ResourceEventPackage) eventReceived;
-                    Resource resource = user.getResources().get(resourceEvent.getResource().getResourceKey());
+                    Resource resource = MulticastPeer.user.getResources().get(resourceEvent.getResource().getResourceKey());
 
-                    if (resource.getResourceState() == ResourceState.HELD ||
-                            (resource.getResourceState() == ResourceState.WANTED &&
-                                    MulticastPeer.resourceRequestTimeStamp.isBefore(resourceEvent.getTimeStamp()))) {
+                    if (resource.getResourceState() == ResourceState.HELD) {
 
-                        user.getResourcesQueues().get(resource.getResourceKey()).add(resourceEvent);
+                        MulticastPeer.user.getResourcesQueues().get(resource.getResourceKey()).add(resourceEvent);
                         ResourceEventPackage resourceResponse = new ResourceEventPackage(EventType.RESOURCE_RESPONSE, user, resource);
                         resourceResponse.setDestinationPublicKey(resourceEvent.getSenderPublicKey());
                         resourceResponse.setResponse(ResourceResponse.OCCUPIED);
@@ -149,7 +135,7 @@ public class ReceptorThread extends MulticastThread {
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
-                    } else {
+                    }else {
                         ResourceEventPackage resourceResponse = new ResourceEventPackage(EventType.RESOURCE_RESPONSE, user, resource);
                         resourceResponse.setDestinationPublicKey(resourceEvent.getSenderPublicKey());
                         resourceResponse.setResponse(ResourceResponse.FREE);
@@ -169,7 +155,7 @@ public class ReceptorThread extends MulticastThread {
                             case FREE:
                                 MulticastPeer.responseLatch.countDown();
                                 if (MulticastPeer.responseLatch.getCount() == 0) {
-                                    user.getResources().get(resourceEvent.getResource().getResourceKey()).setResourceState(ResourceState.HELD);
+                                    MulticastPeer.user.getResources().get(resourceEvent.getResource().getResourceKey()).setResourceState(ResourceState.HELD);
                                     MulticastPeer.isUsingSharedResource = true;
                                     MulticastPeer.currentResourceBeingUsed = resourceEvent.getResource();
                                 }
@@ -185,7 +171,21 @@ public class ReceptorThread extends MulticastThread {
                 case UPDATE_RESOURCE_QUEUE:
                     resourceEvent = (ResourceEventPackage) eventReceived;
                     // Atualiza fila de peers esperando o recurso
-                    user.setResourcesQueues(resourceEvent.getResourcesQueues());
+                    MulticastPeer.user.setResourcesQueues(resourceEvent.getResourcesQueues());
+                    break;
+
+                case REQUEST_ACK:
+                    EventPackage ackResponse = new EventPackage(EventType.ACK_RESPONSE, user.getPeerName(), user.getPublicKey());
+                    ackResponse.setDestinationPublicKey(eventReceived.getDestinationPublicKey());
+                    try {
+                        sendUserEventPackage(socket, group, ackResponse);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+
+                case ACK_RESPONSE:
+                    MulticastPeer.user.getAckPeers().put(eventReceived.getSenderPublicKey(), "Ack");
                     break;
 
             }

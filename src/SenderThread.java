@@ -1,8 +1,13 @@
+import com.sun.org.apache.xpath.internal.operations.Mult;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.Scanner;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 
 public class SenderThread extends MulticastThread{
@@ -27,7 +32,13 @@ public class SenderThread extends MulticastThread{
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        new Thread(()->{
+            new TimeoutThread(socket, group).start();
+        }).start();
+
         while (true) {
+
 
             // Espera o limite máximo de todos os peers responderem
             try {
@@ -59,8 +70,9 @@ public class SenderThread extends MulticastThread{
                 if (user.getResourcesQueues().get(MulticastPeer.currentResourceBeingUsed.getResourceKey()).size() > 0){
 
                     // Chama próximo da fila
-                    ResourceEventPackage nextPeer = user.getResourcesQueues().get(MulticastPeer.currentResourceBeingUsed.getResourceKey()).remove();
-                    ResourceEventPackage callNextPeer = new ResourceEventPackage(EventType.RESOURCE_RESPONSE, user, MulticastPeer.currentResourceBeingUsed);
+                    // Envia a resposta FREE que estava faltando para o peer assumir o uso do recurso
+                    ResourceEventPackage nextPeer = MulticastPeer.user.getResourcesQueues().get(MulticastPeer.currentResourceBeingUsed.getResourceKey()).remove();
+                    ResourceEventPackage callNextPeer = new ResourceEventPackage(EventType.RESOURCE_RESPONSE, MulticastPeer.user, MulticastPeer.currentResourceBeingUsed);
                     callNextPeer.setDestinationPublicKey(nextPeer.getSenderPublicKey());
                     callNextPeer.setResponse(ResourceResponse.FREE);
                     try {
@@ -71,7 +83,7 @@ public class SenderThread extends MulticastThread{
                 }
 
                 // Envia pacote para todos atualizarem a fila de peers para o recurso liberado
-                ResourceEventPackage updateQueuePackage = new ResourceEventPackage(EventType.UPDATE_RESOURCE_QUEUE, user, MulticastPeer.currentResourceBeingUsed);
+                ResourceEventPackage updateQueuePackage = new ResourceEventPackage(EventType.UPDATE_RESOURCE_QUEUE, MulticastPeer.user, MulticastPeer.currentResourceBeingUsed);
                 try {
                     sendUserEventPackage(socket, group, updateQueuePackage);
                 } catch (IOException e) {
@@ -96,7 +108,9 @@ public class SenderThread extends MulticastThread{
                     EventPackage disconnectPackage = new EventPackage(EventType.USER_DISCONNECTED, user.getPeerName(), user.getPublicKey());
                     try {
                         sendUserEventPackage(socket, group, disconnectPackage);
-                        return;
+                        //socket.leaveGroup(group);
+                        //System.exit(0);
+                        //return;
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -140,6 +154,8 @@ public class SenderThread extends MulticastThread{
 
                     MulticastPeer.latch = new CountDownLatch(user.getKeys().size() + 1);
                     MulticastPeer.responseLatch = new CountDownLatch(user.getKeys().size());
+
+                    //Mudança de estado do peer para o recurso selecionado
                     user.getResources().get(nextIndex).setResourceState(ResourceState.WANTED);
                     LocalTime timeStamp = LocalTime.now();
                     MulticastPeer.resourceRequestTimeStamp = timeStamp;

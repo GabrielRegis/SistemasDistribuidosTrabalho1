@@ -8,8 +8,19 @@ public class User implements Serializable {
     private String publicKey;
     private int port;
 
+    //Hash que guarda a chave pública de todos os peers conectados
     HashMap<String,String> keys = new HashMap<String,String>();
+
+    //Hash de todos os usernames dos peers conectados
+    HashMap<String,String> usernames = new HashMap<String,String>();
+
+    //Hash utilizado para controlar os peers que estão respondendo e identificar peers desconectados
+    HashMap<String,String> ackPeers = new HashMap<String,String>();
+
+    //Hash contendo todos os recursos compartilhados
     HashMap<Integer,Resource> resources = new HashMap<Integer, Resource>();
+
+    //Fila atual para cada recurso
     HashMap<Integer,PriorityQueue<ResourceEventPackage>> resourcesQueues = new HashMap<Integer, PriorityQueue<ResourceEventPackage>>();
 
     public User(int port) {
@@ -26,12 +37,28 @@ public class User implements Serializable {
         this.publicKey = publicKey;
     }
 
+    public HashMap<String, String> getUsernames() {
+        return usernames;
+    }
+
+    public void setUsernames(HashMap<String, String> usernames) {
+        this.usernames = usernames;
+    }
+
     public HashMap<Integer, PriorityQueue<ResourceEventPackage>> getResourcesQueues() {
         return resourcesQueues;
     }
 
     public void setResourcesQueues(HashMap<Integer, PriorityQueue<ResourceEventPackage>> resourcesQueues) {
         this.resourcesQueues = resourcesQueues;
+    }
+
+    public HashMap<String, String> getAckPeers() {
+        return ackPeers;
+    }
+
+    public void setAckPeers(HashMap<String, String> ackPeers) {
+        this.ackPeers = ackPeers;
     }
 
     public int getPort() {

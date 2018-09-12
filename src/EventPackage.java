@@ -5,7 +5,7 @@ import java.util.HashMap;
 enum EventType {
     USER_CONNECTED(0), USER_DISCONNECTED(1), USER_DROPED(2), USER_CONNECTED_RESPONSE(3),
     REQUEST_CONNECTED_USERS(4), CONNECTED_USERS_RESPONSE(5), RESOURCE_REQUEST(6), RESOURCE_RESPONSE(7),
-    RELEASE_RESOURCE(8), CREATE_RESOURCE(9), UPDATE_RESOURCE_QUEUE(10);
+    RELEASE_RESOURCE(8), CREATE_RESOURCE(9), UPDATE_RESOURCE_QUEUE(10), REQUEST_ACK(11), ACK_RESPONSE(12);
 
     public int userEventIndex;
     EventType(int index) {
@@ -21,6 +21,9 @@ public class EventPackage implements Serializable {
 
     //Representa o username do peer que enviou o pacote
     private String senderUsername;
+
+    //Representa a
+    private String senderPrivateKey;
 
     //Representa a chave pública do peer que enviou o pacote
     private String senderPublicKey;

@@ -20,7 +20,7 @@ public class MulticastThread extends Thread{
     public static void sendUserEventPackage(MulticastSocket socket, InetAddress group, EventPackage eventPackage) throws IOException {
         byte[] m = SerializationUtils.serialize(eventPackage);
 
-        DatagramPacket messageOut = new DatagramPacket(m, m.length, group, 8000);
+        DatagramPacket messageOut = new DatagramPacket(m, m.length, group, MulticastPeer.socket.getLocalPort());
         socket.send(messageOut);
 
     }

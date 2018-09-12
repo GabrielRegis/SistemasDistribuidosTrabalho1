@@ -1,7 +1,10 @@
 import java.net.*;
 import java.io.*;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Random;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class MulticastPeer {
 
@@ -14,6 +17,9 @@ public class MulticastPeer {
     // Latch é utilizado para controlar quantas repostas o peer está esperando ao enviar um pacote,
     // para que possa prosseguir para a próxima tarefa
     public static CountDownLatch latch = new CountDownLatch(1);
+
+    // Latch utilizado para controlar timout de mensagens (Controle de usuário desconectado)
+    public static CountDownLatch timeOutLatch = new CountDownLatch(1);
 
     // Latch para controle de respostas do algoritmo utilizado para controle da fila de recursos
     public static CountDownLatch responseLatch = null;
@@ -57,10 +63,6 @@ public class MulticastPeer {
             System.out.println("Socket: " + e.getMessage());
         } catch (IOException e) {
             System.out.println("IO: " + e.getMessage());
-        } finally {
-            if (socket != null) {
-                socket.close();
-            }
         }
     }
 
